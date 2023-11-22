@@ -284,7 +284,23 @@ private:
 	int size = LIST_SIZE;
 	int &car(const int root) { return list[root].lchild; }
 	int &cdr(const int root) { return list[root].rchild; }
-
+	void initialize();
+	void doubling();
+	void make_true(int root);
+	void make_false()
+	{
+		for (int i = 1; i <= size; ++i)
+			if (list[i].mchild)
+				list[i].mchild = false;
+	};
+	void gc();
+	int allocate();
+	void copy(int &pasted, int &copied);
+	void deallocate(int i);
+	void deletetree(int root);
+	int apply(const int root);
+	bool check_structure(const int &, const int &);
+	
 public:
 	ListTable()
 	{
@@ -322,23 +338,8 @@ public:
 		}
 		return *this;
 	}
-	void initialize();
-	void doubling();
-	void make_true(int root);
-	void make_false()
-	{
-		for (int i = 1; i <= size; ++i)
-			if (list[i].mchild)
-				list[i].mchild = false;
-	};
-	void gc();
-	int allocate();
-	void copy(int &pasted, int &copied);
-	void deallocate(int i);
-	void deletetree(int root);
 	bool error(int root) { return (root == -LEFT_PARENS); }
-	int eval(int &root);
-	bool check_structure(const int &, const int &);
+	int eval(const int root);
 	void print_entire(int root);
 	int read(Preprocessor &input);
 	void print(int root, bool first);

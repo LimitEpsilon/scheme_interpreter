@@ -47,37 +47,23 @@ bool ListTable::check_structure(const int &r1, const int &r2)
 
 bool check_predefined(int root)
 {
-	return (root == -PLUS || root == -MINUS || root == -TIMES || root == -isEQ || root == -isEQUAL || root == -isNUMBER || root == -isNULL || root == -isSYMBOL || root == -CONS || root == -COND || root == -CAR || root == -CDR || root == -DEFINE || root == -QUOTE || root == -TRUE || root == -FALSE || root == -ELSE);
+	return (root < 0 && root >= -isEQUAL);
 }
 
-int ListTable::eval(int &root)
+int ListTable::apply(const int root)
 {
-	if (error(root) || root == 0)
-		return root;
-	if (root < 0)
-	{
-		if (isNumber(ht->find(root)) || check_predefined(root))
-			return root;
-		if (!ht->defined(-root))
-		{
-			cout << "Unbound symbol " << ht->hashtable[-root].lchild << endl;
-			return -LEFT_PARENS;
-		}
-		return ht->value(-root);
-	}
+	int ret = 0;
 	gcstack->push(root); // prepare in case gc happens during evaluation
-	int &tokenindex = car(root);
-	// root is the list (operator operands), tokenindex is the operator
-	// car(cdr(root)) is the first operand, car(cdr(cdr(root)) is the second operand
-	if (tokenindex == -PLUS)
+	int function = eval(car(root));
+	if (function == -PLUS)
 	{
 		int op1 = eval(car(cdr(root)));		 // get first operand.
 		int op2 = eval(car(cdr(cdr(root)))); // get second operand
 		if (op1 >= 0 || op2 >= 0 || error(op1) || error(op2))
 		{
 			cout << "PLUS error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		string arg1 = ht->find(op1);
 		string arg2 = ht->find(op2);
@@ -85,24 +71,24 @@ int ListTable::eval(int &root)
 		if (!num1 || !num2)
 		{
 			cout << "PLUS error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
-		gcstack->pop();
+
 		if (num1 == 'f' || num2 == 'f')
-			return ht->get_hash(to_string(stof(arg1) + stof(arg2)));
+			ret = ht->get_hash(to_string(stof(arg1) + stof(arg2)));
 		else
-			return ht->get_hash(to_string(stoi(arg1) + stoi(arg2)));
+			ret = ht->get_hash(to_string(stoi(arg1) + stoi(arg2)));
 	}
-	else if (tokenindex == -MINUS)
+	else if (function == -MINUS)
 	{
 		int op1 = eval(car(cdr(root)));
 		int op2 = eval(car(cdr(cdr(root))));
 		if (op1 >= 0 || op2 >= 0 || error(op1) || error(op2))
 		{
 			cout << "MINUS error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		string arg1 = ht->find(op1);
 		string arg2 = ht->find(op2);
@@ -110,24 +96,24 @@ int ListTable::eval(int &root)
 		if (!num1 || !num2)
 		{
 			cout << "MINUS error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
-		gcstack->pop();
+
 		if (num1 == 'f' || num2 == 'f')
-			return ht->get_hash(to_string(stof(arg1) - stof(arg2)));
+			ret = ht->get_hash(to_string(stof(arg1) - stof(arg2)));
 		else
-			return ht->get_hash(to_string(stoi(arg1) - stoi(arg2)));
+			ret = ht->get_hash(to_string(stoi(arg1) - stoi(arg2)));
 	}
-	else if (tokenindex == -TIMES)
+	else if (function == -TIMES)
 	{
 		int op1 = eval(car(cdr(root)));
 		int op2 = eval(car(cdr(cdr(root))));
 		if (op1 >= 0 || op2 >= 0 || error(op1) || error(op2))
 		{
 			cout << "TIMES error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		string arg1 = ht->find(op1);
 		string arg2 = ht->find(op2);
@@ -135,29 +121,28 @@ int ListTable::eval(int &root)
 		if (!num1 || !num2)
 		{
 			cout << "TIMES error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
-		gcstack->pop();
+
 		if (num1 == 'f' || num2 == 'f')
-			return ht->get_hash(to_string(stof(arg1) * stof(arg2)));
+			ret = ht->get_hash(to_string(stof(arg1) * stof(arg2)));
 		else
-			return ht->get_hash(to_string(stoi(arg1) * stoi(arg2)));
+			ret = ht->get_hash(to_string(stoi(arg1) * stoi(arg2)));
 	}
-	else if (tokenindex == -isEQ)
+	else if (function == -isEQ)
 	{
 		int op1 = eval(car(cdr(root)));
 		int op2 = eval(car(cdr(cdr(root))));
 		if (error(op1) || error(op2))
 		{
 			cout << "EQ error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		if (op1 == op2)
 		{
-			gcstack->pop();
-			return -TRUE;
+			ret = -TRUE;
 		}
 		else if (op1 < 0 && op2 < 0)
 		{
@@ -165,135 +150,121 @@ int ListTable::eval(int &root)
 			string arg2 = ht->find(op2);
 			if (isNumber(arg1) && isNumber(arg2) && (stof(arg1) == stof(arg2)))
 			{
-				gcstack->pop();
-				return -TRUE;
+				ret = -TRUE;
 			}
 			else
 			{
-				gcstack->pop();
-				return -FALSE;
+				ret = -FALSE;
 			}
 		}
 		else
 		{
-			gcstack->pop();
-			return -FALSE;
+			ret = -FALSE;
 		}
 	}
-	else if (tokenindex == -isEQUAL)
+	else if (function == -isEQUAL)
 	{
 		int op1 = eval(car(cdr(root)));
 		int op2 = eval(car(cdr(cdr(root))));
 		if (error(op1) || error(op2))
 		{
 			cout << "EQUAL error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		if (check_structure(op1, op2))
 		{
-			gcstack->pop();
-			return -TRUE;
+			ret = -TRUE;
 		}
 		else
 		{
-			gcstack->pop();
-			return -FALSE;
+			ret = -FALSE;
 		}
 	}
-	else if (tokenindex == -isNUMBER)
+	else if (function == -isNUMBER)
 	{
 		int op = eval(car(cdr(root)));
 		if (error(op))
 		{
 			cout << "NUMBER? error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		if (op >= 0)
 		{
-			gcstack->pop();
-			return -FALSE;
+			ret = -FALSE;
 		}
 		else if (isNumber(ht->find(op)))
 		{
-			gcstack->pop();
-			return -TRUE;
+			ret = -TRUE;
 		}
 		else
 		{
-			gcstack->pop();
-			return -FALSE;
+			ret = -FALSE;
 		}
 	}
-	else if (tokenindex == -isSYMBOL)
+	else if (function == -isSYMBOL)
 	{
 		int op = eval(car(cdr(root)));
 		if (error(op))
 		{
 			cout << "SYMBOL? error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		if (op >= 0)
 		{
-			gcstack->pop();
-			return -FALSE;
+			ret = -FALSE;
 		}
 		else if (isNumber(ht->find(op)) || check_predefined(op))
 		{
-			gcstack->pop();
-			return -FALSE;
+			ret = -FALSE;
 		}
 		else
 		{
-			gcstack->pop();
-			return -TRUE;
+			ret = -TRUE;
 		}
 	}
-	else if (tokenindex == -isNULL)
+	else if (function == -isNULL)
 	{
 		int op = eval(car(cdr(root)));
 		if (error(op))
 		{
 			cout << "NULL? error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		if (op == 0)
 		{
-			gcstack->pop();
-			return -TRUE;
+			ret = -TRUE;
 		}
 		else
 		{
-			gcstack->pop();
-			return -FALSE;
+			ret = -FALSE;
 		}
 	}
-	else if (tokenindex == -CONS)
+	else if (function == -CONS)
 	{
 		int op1 = eval(car(cdr(root)));
 		int op2 = eval(car(cdr(cdr(root))));
 		if (error(op1) || error(op2))
 		{
 			cout << "CONS error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		int newmemory = allocate();
 		if (error(newmemory))
 		{
 			cout << "CONS error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		car(newmemory) = op1;
 		cdr(newmemory) = op2;
-		gcstack->pop();
-		return newmemory;
+		ret = newmemory;
 	}
-	else if (tokenindex == -COND)
+	else if (function == -COND)
 	{ // root is root of (cond (P1 E1) (P2 E2) ... (Pn En) (else E))
 		int cursor = root;
 		while (cdr(cdr(cursor)) != 0)
@@ -302,134 +273,113 @@ int ListTable::eval(int &root)
 			int condition = eval(car(car(cursor)));
 			if (error(condition))
 			{
-				cout << "COND error" << endl;
-				gcstack->pop();
-				return -LEFT_PARENS;
+				cout << "COND error at condition" << endl;
+				ret = -LEFT_PARENS;
+				goto cleanup;
 			}
 			if (condition == -TRUE)
 			{
 				int result = eval(car(cdr(car(cursor))));
 				if (error(result))
 				{
-					cout << "COND error" << endl;
-					gcstack->pop();
-					return -LEFT_PARENS;
+					cout << "COND error at result" << endl;
+					ret = -LEFT_PARENS;
+					goto cleanup;
 				}
-				gcstack->pop();
-				return result;
+				ret = result;
+				goto cleanup;
 			}
 		}
 		if (car(car(cdr(cursor))) != -ELSE)
 		{
 			cout << "COND error, no ELSE" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		int result = eval(car(cdr(car(cdr(cursor)))));
 		if (error(result))
 		{
-			cout << "COND error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			cout << "COND error at ELSE result" << endl;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
-		gcstack->pop();
-		return result;
+		ret = result;
 	}
-	else if (tokenindex == -CAR)
+	else if (function == -CAR)
 	{
 		int op = eval(car(cdr(root)));
 		if (error(op))
 		{
 			cout << "CAR error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		if (op > 0)
 		{
-			gcstack->pop();
-			return car(op);
+			ret = car(op);
 		}
 		else
 		{
 			cout << "Cannot CAR a symbol or an empty list" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 	}
-	else if (tokenindex == -CDR)
+	else if (function == -CDR)
 	{
 		int op = eval(car(cdr(root)));
 		if (error(op))
 		{
 			cout << "CDR error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		if (op > 0)
 		{
-			gcstack->pop();
-			return cdr(op);
+			ret = cdr(op);
 		}
 		else
 		{
 			cout << "Cannot CDR a symbol or an empty list" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 	}
-	else if (tokenindex == -DEFINE)
+	else if (function == -DEFINE)
 	{
 		if (isNumber(ht->find(car(cdr(root)))))
 		{
 			cout << "Don't redefine numbers" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		else if (check_predefined(car(cdr(root))))
 		{
 			cout << "Don't redefine pre-defined symbols" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
-		int &def = car(cdr(cdr(root))); // definition of object defined
-		if (def > 0 && car(def) == -LAMBDA)
+		int definition = eval(car(cdr(cdr(root))));
+		if (error(definition))
 		{
-			ht->value(-car(cdr(root))) = def;
+			cout << "DEFINE error" << endl;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
-		else
-		{
-			int definition = eval(def);
-			if (error(definition))
-			{
-				cout << "DEFINE error" << endl;
-				gcstack->pop();
-				return -LEFT_PARENS;
-			}
-			ht->value(-car(cdr(root))) = definition;
-		}
+		ht->value(-car(cdr(root))) = definition;
 		ht->defined(-car(cdr(root))) = true;
-		gcstack->pop();
-		return car(cdr(root));
+		ret = car(cdr(root));
 	}
-	else if (tokenindex == -QUOTE)
+	else if (function == -QUOTE)
 	{
-		gcstack->pop();
-		return car(cdr(root));
+		ret = car(cdr(root));
 	}
-	else if (tokenindex == -LAMBDA)
+	else if (function == -LAMBDA)
 	{
-		gcstack->pop();
-		return root;
+		ret = root;
 	}
-	else // root is the root to (function real-parameter-list)
+	else if (car(function) == -LAMBDA) // root is the root to (user-defined-function real-parameter-list)
 	{
-		int function = eval(tokenindex); // expect root to (lambda (function-params) (function-body))
-		if (function <= 0 || car(function) != -LAMBDA)
-		{
-			cout << "Expected a lambda in function position" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
-		}
 		function = cdr(function);	   // function is the root to ((function-parameters) (function-body))
 		int paramlist = car(function); // paramlist is the root to (function-parameters)
 		int body = car(cdr(function)); // body is the root to (function-body)
@@ -442,8 +392,8 @@ int ListTable::eval(int &root)
 			if (error(temp))
 			{
 				cout << "FUNCTION PARAMETER error" << endl;
-				gcstack->pop();
-				return -LEFT_PARENS;
+				ret = -LEFT_PARENS;
+				goto cleanup;
 			}
 			preeval.push(car(paramlist), temp);
 			cursor_pre = cdr(cursor_pre);
@@ -452,14 +402,14 @@ int ListTable::eval(int &root)
 		if (cursor_pre != 0)
 		{
 			cout << "Too many parameters given" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		else if (paramlist != 0)
 		{
 			cout << "Too little parameters given" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		int numofparam = 0;
 		paramlist = car(function);
@@ -482,8 +432,8 @@ int ListTable::eval(int &root)
 		if (error(result))
 		{
 			cout << "FUNCTION EVALUATION error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
+			ret = -LEFT_PARENS;
+			goto cleanup;
 		}
 		// restore bindings: currying is not supported
 		Node<int, int, bool> temp;
@@ -493,8 +443,34 @@ int ListTable::eval(int &root)
 			ht->value(-temp.lchild) = temp.rchild;
 			ht->defined(-temp.lchild) = temp.mchild;
 		}
-		gcstack->pop();
-		return result;
+		ret = result;
 	}
-	return 0;
+	else
+	{
+		print(root, true);
+		print(car(root), true);
+		cout << "Function part of apply is not a function" << endl;
+		ret = -LEFT_PARENS;
+	}
+cleanup:
+	gcstack->pop();
+	return ret;
+}
+
+int ListTable::eval(const int root)
+{
+	if (error(root) || root == 0) // null list or error
+		return root;
+	if (root < 0) // symbol
+	{
+		if (isNumber(ht->find(root)) || check_predefined(root))
+			return root;
+		if (!ht->defined(-root))
+		{
+			cout << "Unbound symbol " << ht->hashtable[-root].lchild << endl;
+			return -LEFT_PARENS;
+		}
+		return ht->value(-root);
+	}
+	return apply(root); // application
 }

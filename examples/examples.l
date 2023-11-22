@@ -4,6 +4,6 @@
 (define (reverse l) (cond ((null? l) l) (else (append (reverse (cdr l)) (cons (car l) '()]
 (define (map f x) (cond ((null? x) '()) (else (cons (f (car x)) (map f (cdr x]
 (define (sum n total)(cond ((eq? n 0) total) (else (sum (- n 1) (+ n total]
-(define (list-ref l k) (cond ((null? l) 'error) ((equal? k 1) (car l)) (else (list-ref (cdr l) (- k 1)))))
-(map (lambda (l) (car l)) '((a b) (c d)))
+(define (list-ref l k) (cond ((null? l) 'error) ((equal? k 1) (car l)) (else (list-ref (cdr l) (- k 1]
+(map car '((a b) (c d]
 

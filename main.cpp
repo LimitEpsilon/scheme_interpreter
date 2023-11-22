@@ -9,6 +9,7 @@ int main()
 {
 	cout << "Scheme interpreter, ver. 191015, by Joonhyup Lee, Department of ECE at SNU." << endl;
 	cout << "Welcome to the Scheme interpreter! To end your input, press ENTER." << endl;
+	cout << "To quit, write \"quit\" and press ENTER." << endl;
 	Tokenized *input = new Tokenized();	 // make buffer
 	ListTable *memory = new ListTable(); // make memory
 	Preprocessor *preprocessed = new Preprocessor();
