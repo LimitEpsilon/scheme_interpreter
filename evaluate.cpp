@@ -416,29 +416,23 @@ int ListTable::eval(int &root)
 		gcstack->pop();
 		return car(cdr(root));
 	}
-	else if (tokenindex < 0)
-	{ // root is the root to (function real-parameter-list)
-		if (check_predefined(ht->value(-tokenindex)))
-		{ // predefined function
-			tokenindex = ht->value(-tokenindex);
-			gcstack->pop();
-			return eval(root);
-		}
-		else if (ht->value(-tokenindex) == 0)
+	else if (tokenindex == -LAMBDA)
+	{
+		gcstack->pop();
+		return root;
+	}
+	else // root is the root to (function real-parameter-list)
+	{
+		int function = eval(tokenindex); // expect root to (lambda (function-params) (function-body))
+		if (function <= 0 || car(function) != -LAMBDA)
 		{
-			cout << "Not a user defined function, not list" << endl;
+			cout << "Expected a lambda in function position" << endl;
 			gcstack->pop();
 			return -LEFT_PARENS;
 		}
-		else if (car(ht->value(-tokenindex)) != -LAMBDA)
-		{
-			cout << "Not a user defined function, not lambda expression" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
-		}
-		int function = cdr(ht->value(-tokenindex)); // function is the root to ((function-parameters) (function-body))
-		int paramlist = car(function);				// paramlist is the root to (function-parameters)
-		int body = car(cdr(function));				// body is the root to (function-body)
+		function = cdr(function);	   // function is the root to ((function-parameters) (function-body))
+		int paramlist = car(function); // paramlist is the root to (function-parameters)
+		int body = car(cdr(function)); // body is the root to (function-body)
 		int cursor = root;
 		int cursor_pre = cdr(root); // used to pre-evaluate the real parameters
 		LinkedStack preeval = LinkedStack();
@@ -491,6 +485,7 @@ int ListTable::eval(int &root)
 			gcstack->pop();
 			return -LEFT_PARENS;
 		}
+		// restore bindings: currying is not supported
 		Node<int, int, bool> temp;
 		for (int i = 0; i < numofparam; ++i)
 		{
@@ -500,79 +495,6 @@ int ListTable::eval(int &root)
 		}
 		gcstack->pop();
 		return result;
-	}
-	else if (car(tokenindex) == -LAMBDA)
-	{
-		int function = cdr(tokenindex); // function is the root to ((function-parameters) (function-body))
-		int paramlist = car(function);	// paramlist is the root to (function-parameters)
-		int body = car(cdr(function));	// body is the root to (function-body)
-		int cursor = root;
-		int cursor_pre = cdr(root); // used to pre-evaluate the real parameters
-		LinkedStack preeval = LinkedStack();
-		while (cursor_pre != 0 && paramlist != 0)
-		{ // pre-evaluate real parameters
-			int temp = eval(car(cursor_pre));
-			if (error(temp))
-			{
-				cout << "LAMBDA PARAMETER error" << endl;
-				gcstack->pop();
-				return -LEFT_PARENS;
-			}
-			preeval.push(car(paramlist), temp);
-			cursor_pre = cdr(cursor_pre);
-			paramlist = cdr(paramlist);
-		}
-		if (cursor_pre != 0)
-		{
-			cout << "Too many parameters given" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
-		}
-		else if (paramlist != 0)
-		{
-			cout << "Too little parameters given" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
-		}
-		int numofparam = 0;
-		paramlist = car(function);
-		ChainNode chain = ChainNode();
-		while (paramlist != 0)
-		{
-			cursor = cdr(cursor); // in the first loop, cursor is the root to (real-parameter-list).
-			int parameter = car(paramlist);
-			stack->push(Node<int, int, bool>(parameter, ht->value(-parameter), ht->defined(-parameter)));
-			paramlist = cdr(paramlist);
-			++numofparam;
-		}
-		while (!preeval.is_empty())
-		{
-			chain = preeval.pop();
-			ht->value(-chain.hash) = chain.value;
-			ht->defined(-chain.hash) = true;
-		}
-		int result = eval(body);
-		if (error(result))
-		{
-			cout << "LAMBDA EVALUATION error" << endl;
-			gcstack->pop();
-			return -LEFT_PARENS;
-		}
-		Node<int, int, bool> temp;
-		for (int i = 0; i < numofparam; ++i)
-		{
-			temp = stack->pop();
-			ht->value(-temp.lchild) = temp.rchild;
-			ht->defined(-temp.lchild) = temp.mchild;
-		}
-		gcstack->pop();
-		return result;
-	}
-	else
-	{
-		cout << "Not a valid expression" << endl;
-		gcstack->pop();
-		return -LEFT_PARENS;
 	}
 	return 0;
 }

@@ -275,10 +275,14 @@ void ListTable::gc()
 	make_false();
 	for (int i = 1; i <= ht->size; ++i)
 	{
-		if (ht->value(i) <= 0)
-			;
-		else
+		if (ht->value(i) > 0)
 			make_true(ht->hashtable[i].rchild);
+	}
+	Node<int, int, bool> temp;
+	for (int i = 0; i <= stack->last; ++i)
+	{
+		temp = stack->stack[i];
+		make_true(temp.rchild);
 	}
 	for (int i = 0; i <= gcstack->last; ++i)
 	{
